@@ -3,7 +3,7 @@
 <i>How much temporal information can a VAE preserve while compressing video into a low-dimensional latent space?</i>
 
 
-This project is a lightweight research-style implementation of a **Video Variational Autoencoder (Video VAE)** pipeline, inspired by [this paper by P. Wu et. al](https://arxiv.org/pdf/2411.06449). It explores how much temporal information a VAE can preserve when compressing short video clips into low-dimensional latent representations.
+This project is a lightweight research-style implementation of a **Video Variational Autoencoder (Video VAE)** pipeline, inspired by [this paper by P. Wu et. al](https://openaccess.thecvf.com/content/CVPR2025/papers/Wu_Improved_Video_VAE_for_Latent_Video_Diffusion_Model_CVPR_2025_paper.pdf). It explores how much temporal information a VAE can preserve when compressing short video clips into low-dimensional latent representations.
 
 The project is intentionally runnable without downloading large video datasets. By default, it uses a synthetic moving-shapes dataset.
 
