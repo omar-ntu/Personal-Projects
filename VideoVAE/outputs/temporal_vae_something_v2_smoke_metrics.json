@@ -1,0 +1,42 @@
+{
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.08972005256348187,
+      "train_recon": 0.08971522086196476,
+      "train_kl": 0.004833244615130954,
+      "val_loss": 0.11645758897066116,
+      "val_recon": 0.11645607091486454,
+      "val_kl": 0.0015190988779067993,
+      "val_mse": 0.11645607091486454,
+      "val_psnr": 9.90169906616211,
+      "val_ssim_global": 0.03303699940443039,
+      "val_temporal_mse": 0.00841918506193906
+    }
+  ],
+  "config": {
+    "dataset": "something-v2",
+    "data_root": "data/something_something_v2",
+    "video_root": null,
+    "split": "train",
+    "num_videos": 1000,
+    "frames": 16,
+    "image_size": 64,
+    "input_channels": 3,
+    "batch_size": 2,
+    "epochs": 1,
+    "latent_dim": 32,
+    "clips_per_video": 1,
+    "frame_stride": 1,
+    "max_videos": 20,
+    "val_fraction": 0.15,
+    "beta": 0.001,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "seed": 42,
+    "device": "cpu",
+    "out": "checkpoints/temporal_vae_something_v2_smoke.pt",
+    "metrics_out": "outputs/temporal_vae_something_v2_smoke_metrics.json",
+    "model_type": "temporal_vae"
+  }
+}

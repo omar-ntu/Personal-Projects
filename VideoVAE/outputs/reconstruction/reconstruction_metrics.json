@@ -1,0 +1,10 @@
+{
+  "checkpoint": "checkpoints/temporal_vae.pt",
+  "sample_index": 0,
+  "metrics": {
+    "mse": 0.027661597356200218,
+    "psnr": 15.58122730255127,
+    "ssim_global": 0.523544192314148,
+    "temporal_mse": 0.00038622229476459324
+  }
+}

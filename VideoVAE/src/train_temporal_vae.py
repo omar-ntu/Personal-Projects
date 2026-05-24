@@ -16,14 +16,23 @@ def train(args: argparse.Namespace) -> Dict[str, float]:
     set_seed(args.seed)
     device = get_device(args.device)
     train_loader, val_loader = build_dataloaders(
+        dataset=args.dataset,
+        data_root=args.data_root,
+        video_root=args.video_root,
+        split=args.split,
         num_videos=args.num_videos,
         frames=args.frames,
         image_size=args.image_size,
+        input_channels=args.input_channels,
         batch_size=args.batch_size,
         anomaly_prob=0.0,
+        clips_per_video=args.clips_per_video,
+        frame_stride=args.frame_stride,
+        max_videos=args.max_videos,
         seed=args.seed,
+        val_fraction=args.val_fraction,
     )
-    model = TemporalVAE(latent_dim=args.latent_dim, frames=args.frames, image_size=args.image_size).to(device)
+    model = TemporalVAE(latent_dim=args.latent_dim, frames=args.frames, image_size=args.image_size, input_channels=args.input_channels).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     history = []
@@ -76,13 +85,22 @@ def validate(model: TemporalVAE, loader, device: torch.device, beta: float) -> D
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train a temporal 3D-convolutional VAE on synthetic moving-shape videos.")
+    parser = argparse.ArgumentParser(description="Train a temporal 3D-convolutional VAE on synthetic or folder-based videos.")
+    parser.add_argument("--dataset", type=str, default="synthetic", choices=["synthetic", "folder", "something-v2"])
+    parser.add_argument("--data-root", type=str, default=None, help="Root containing class folders, videos, frame folders, or Something-Something labels.")
+    parser.add_argument("--video-root", type=str, default=None, help="Optional video directory override for Something-Something V2.")
+    parser.add_argument("--split", type=str, default="train", help="Dataset split for Something-Something V2.")
     parser.add_argument("--num-videos", type=int, default=1000)
     parser.add_argument("--frames", type=int, default=16)
     parser.add_argument("--image-size", type=int, default=32)
+    parser.add_argument("--input-channels", type=int, default=1, choices=[1, 3])
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--latent-dim", type=int, default=64)
+    parser.add_argument("--clips-per-video", type=int, default=1)
+    parser.add_argument("--frame-stride", type=int, default=1)
+    parser.add_argument("--max-videos", type=int, default=None)
+    parser.add_argument("--val-fraction", type=float, default=0.15)
     parser.add_argument("--beta", type=float, default=1e-3)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-4)

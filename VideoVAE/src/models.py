@@ -14,14 +14,16 @@ class FrameVAE(nn.Module):
     modelling beyond seeing each frame separately.
     """
 
-    def __init__(self, latent_dim: int = 32, image_size: int = 32):
+    def __init__(self, latent_dim: int = 32, image_size: int = 32, input_channels: int = 1):
         super().__init__()
-        if image_size != 32:
-            raise ValueError("This lightweight implementation assumes image_size=32.")
+        if image_size % 8 != 0:
+            raise ValueError("image_size must be divisible by 8.")
         self.latent_dim = latent_dim
         self.image_size = image_size
+        self.input_channels = input_channels
+        self.enc_size = image_size // 8
         self.encoder = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=4, stride=2, padding=1),
+            nn.Conv2d(input_channels, 8, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(8, 16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
@@ -29,17 +31,17 @@ class FrameVAE(nn.Module):
             nn.ReLU(inplace=True),
             nn.Flatten(),
         )
-        self.enc_dim = 32 * 4 * 4
+        self.enc_dim = 32 * self.enc_size * self.enc_size
         self.fc_mu = nn.Linear(self.enc_dim, latent_dim)
         self.fc_logvar = nn.Linear(self.enc_dim, latent_dim)
         self.fc_decode = nn.Linear(latent_dim, self.enc_dim)
         self.decoder = nn.Sequential(
-            nn.Unflatten(1, (32, 4, 4)),
+            nn.Unflatten(1, (32, self.enc_size, self.enc_size)),
             nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose2d(8, input_channels, kernel_size=4, stride=2, padding=1),
             nn.Sigmoid(),
         )
 
@@ -57,7 +59,7 @@ class FrameVAE(nn.Module):
         return self.decoder(self.fc_decode(z))
 
     def forward(self, video: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # video: [B, 1, T, H, W]
+        # video: [B, C, T, H, W]
         b, c, t, h, w = video.shape
         frames = video.permute(0, 2, 1, 3, 4).reshape(b * t, c, h, w)
         mu, logvar = self.encode_frames(frames)
@@ -78,7 +80,7 @@ class FrameVAE(nn.Module):
         # z: [B, T, latent_dim]
         b, t, d = z.shape
         frames = self.decode_frames(z.reshape(b * t, d))
-        return frames.reshape(b, t, 1, self.image_size, self.image_size).permute(0, 2, 1, 3, 4)
+        return frames.reshape(b, t, self.input_channels, self.image_size, self.image_size).permute(0, 2, 1, 3, 4)
 
 
 class TemporalVAE(nn.Module):
@@ -88,15 +90,20 @@ class TemporalVAE(nn.Module):
     its encoder must preserve both spatial appearance and motion information.
     """
 
-    def __init__(self, latent_dim: int = 64, frames: int = 16, image_size: int = 32):
+    def __init__(self, latent_dim: int = 64, frames: int = 16, image_size: int = 32, input_channels: int = 1):
         super().__init__()
-        if frames != 16 or image_size != 32:
-            raise ValueError("This lightweight implementation assumes frames=16 and image_size=32.")
+        if frames % 8 != 0:
+            raise ValueError("frames must be divisible by 8.")
+        if image_size % 8 != 0:
+            raise ValueError("image_size must be divisible by 8.")
         self.latent_dim = latent_dim
         self.frames = frames
         self.image_size = image_size
+        self.input_channels = input_channels
+        self.enc_frames = frames // 8
+        self.enc_size = image_size // 8
         self.encoder = nn.Sequential(
-            nn.Conv3d(1, 8, kernel_size=4, stride=2, padding=1),
+            nn.Conv3d(input_channels, 8, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv3d(8, 16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
@@ -104,8 +111,8 @@ class TemporalVAE(nn.Module):
             nn.ReLU(inplace=True),
             nn.Flatten(),
         )
-        self.enc_shape = (32, 2, 4, 4)
-        self.enc_dim = 32 * 2 * 4 * 4
+        self.enc_shape = (32, self.enc_frames, self.enc_size, self.enc_size)
+        self.enc_dim = 32 * self.enc_frames * self.enc_size * self.enc_size
         self.fc_mu = nn.Linear(self.enc_dim, latent_dim)
         self.fc_logvar = nn.Linear(self.enc_dim, latent_dim)
         self.fc_decode = nn.Linear(latent_dim, self.enc_dim)
@@ -115,7 +122,7 @@ class TemporalVAE(nn.Module):
             nn.ReLU(inplace=True),
             nn.ConvTranspose3d(16, 8, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose3d(8, 1, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose3d(8, input_channels, kernel_size=4, stride=2, padding=1),
             nn.Sigmoid(),
         )
 

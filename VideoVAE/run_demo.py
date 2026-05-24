@@ -41,12 +41,12 @@ def main() -> None:
         save_checkpoint(
             "checkpoints/frame_vae.pt",
             frame_vae,
-            config={"model_type": "frame_vae", "latent_dim": 16, "frames": 16, "image_size": 32},
+            config={"model_type": "frame_vae", "latent_dim": 16, "frames": 16, "image_size": 32, "input_channels": 1},
         )
         save_checkpoint(
             "checkpoints/temporal_vae.pt",
             temporal_vae,
-            config={"model_type": "temporal_vae", "latent_dim": 32, "frames": 16, "image_size": 32},
+            config={"model_type": "temporal_vae", "latent_dim": 32, "frames": 16, "image_size": 32, "input_channels": 1},
         )
 
         save_video_strip(video_a[0], "outputs/input_strip.png", title="input video")

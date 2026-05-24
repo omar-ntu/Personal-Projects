@@ -5,7 +5,7 @@ from typing import List
 
 import torch
 
-from .data import SyntheticMovingShapesDataset, VideoConfig
+from .data import build_dataset
 from .evaluate import build_model_from_checkpoint
 from .utils import get_device, save_json
 from .visualize import save_keyframe_strip, save_video_strip
@@ -41,13 +41,21 @@ def main(args: argparse.Namespace) -> None:
     if cfg.get("model_type") != "frame_vae":
         raise ValueError("Latent keyframe summarisation currently expects a FrameVAE checkpoint because it has one latent vector per frame.")
 
-    dataset = SyntheticMovingShapesDataset(VideoConfig(
+    dataset = build_dataset(
+        dataset=args.dataset,
+        data_root=args.data_root,
+        video_root=args.video_root,
+        split=args.split,
         num_videos=max(args.index + 1, 4),
         frames=int(cfg.get("frames", 16)),
         image_size=int(cfg.get("image_size", 32)),
+        input_channels=int(cfg.get("input_channels", 1)),
         anomaly_prob=args.anomaly_prob,
+        clips_per_video=args.clips_per_video,
+        frame_stride=args.frame_stride,
+        max_videos=args.max_videos,
         seed=args.seed,
-    ))
+    )
     video = dataset[args.index]["video"].unsqueeze(0).to(device)
     latents = model.encode_video_mu(video)[0]
     indices = select_keyframes_from_latents(latents, args.num_keyframes)
@@ -59,10 +67,17 @@ def main(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Use frame-wise VAE latents to select keyframes for a simple video summary.")
+    parser.add_argument("--dataset", type=str, default="synthetic", choices=["synthetic", "folder", "something-v2"])
+    parser.add_argument("--data-root", type=str, default=None, help="Root containing class folders, videos, frame folders, or Something-Something labels.")
+    parser.add_argument("--video-root", type=str, default=None, help="Optional video directory override for Something-Something V2.")
+    parser.add_argument("--split", type=str, default="validation", help="Dataset split for Something-Something V2.")
     parser.add_argument("--ckpt", type=str, default="checkpoints/frame_vae.pt")
     parser.add_argument("--index", type=int, default=0)
     parser.add_argument("--num-keyframes", type=int, default=5)
     parser.add_argument("--anomaly-prob", type=float, default=0.0)
+    parser.add_argument("--clips-per-video", type=int, default=1)
+    parser.add_argument("--frame-stride", type=int, default=1)
+    parser.add_argument("--max-videos", type=int, default=None)
     parser.add_argument("--seed", type=int, default=777)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--out-dir", type=str, default="outputs")

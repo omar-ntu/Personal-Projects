@@ -1,270 +1,283 @@
-# Video VAE for Latent Video Compression and Generation
+# Video VAE for Latent Video Compression
 
-<i>How much temporal information can a VAE preserve while compressing video into a low-dimensional latent space?</i>
+A compact PyTorch research project for learning latent representations of short video clips with variational autoencoders.
 
+The project compares two approaches:
 
-This project is a lightweight research-style implementation of a **Video Variational Autoencoder (Video VAE)** pipeline, inspired by [this paper by P. Wu et. al](https://openaccess.thecvf.com/content/CVPR2025/papers/Wu_Improved_Video_VAE_for_Latent_Video_Diffusion_Model_CVPR_2025_paper.pdf). It explores how much temporal information a VAE can preserve when compressing short video clips into low-dimensional latent representations.
+- **FrameVAE**: compresses each frame independently with 2D convolutions.
+- **TemporalVAE**: compresses an entire clip with 3D convolutions over time, height, and width.
 
-The project is intentionally runnable without downloading large video datasets. By default, it uses a synthetic moving-shapes dataset.
+It can run on a synthetic moving-shapes dataset, or on real videos such as Something-Something V2.
 
+## What This Shows
 
-The project compares two models:
+This repository demonstrates:
 
-1. **Frame-wise VAE**  
-   Compresses each frame independently using 2D convolutions. This is a baseline that captures spatial appearance but does not explicitly model temporal dynamics.
-
-2. **Temporal Video VAE**  
-   Compresses the entire video clip using 3D convolutions over time, height, and width. This model learns a single latent vector for a full clip, so it must preserve both spatial and motion information.
-
----
-
-## What this project demonstrates
-
-This project demonstrates:
-
-- Video latent representation learning
-- Frame-wise vs temporal VAE comparison
-- Video reconstruction
+- Video reconstruction with VAEs
+- Frame-wise vs temporal latent compression
 - Latent-space interpolation between clips
-- Simple latent-based video summarisation
-- Reconstruction metrics such as MSE, PSNR, SSIM approximation, and temporal reconstruction error
-- A small but complete pipeline that can be extended to real datasets
+- Latent-based keyframe selection
+- Reconstruction metrics including MSE, PSNR, approximate SSIM, and temporal MSE
+- A practical pipeline for moving from synthetic clips to real video data
 
----
+The central question is:
+
+> How much visual and temporal information can a small VAE preserve when compressing short videos into low-dimensional latent vectors?
+
+## Example Outputs
+
+The main outputs are saved PNG strips and JSON metrics:
+
+```text
+outputs/
+  reconstruction/
+    input_strip.png
+    reconstruction_strip.png
+    reconstruction_comparison.png
+    reconstruction_metrics.json
+  latent_interpolation.png
+  latent_keyframes.png
+  evaluation.json
+```
+
+`reconstruction_comparison.png` shows:
+
+```text
+input video frames
+reconstructed video frames
+mean absolute error
+```
+
+The temporal VAE is intentionally small, so early results are blurry. The useful signal is whether training improves reconstruction quality and whether motion is preserved across frames.
+
+## Project Structure
+
+```text
+video_vae_latent_video/
+  src/
+    data.py                  # Synthetic, folder, and Something-Something V2 datasets
+    models.py                # FrameVAE and TemporalVAE
+    losses.py                # VAE loss and reconstruction metrics
+    train_frame_vae.py       # Frame-wise baseline training
+    train_temporal_vae.py    # Temporal VAE training
+    evaluate.py              # Metric evaluation
+    reconstruct_clip.py      # Reconstruction visualization
+    interpolate_latents.py   # Latent interpolation demo
+    summarize_video.py       # Latent keyframe selection
+    visualize.py             # PNG visualizations
+  scripts/
+    prepare_something_something_v2.ps1
+  checkpoints/
+  outputs/
+  run_demo.py
+  requirements.txt
+```
+
+The previous long-form workflow notes are kept in [`README_FULL_WORKFLOW.md`](README_FULL_WORKFLOW.md).
 
 ## Setup
 
-Create and activate a virtual environment.
+Create a virtual environment:
 
-### Windows
-
-```bash
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 ```
 
 Install dependencies:
 
-```bash
+```powershell
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+If you want GPU training, install a CUDA-enabled PyTorch build that matches your driver. For example, for CUDA 13.0:
 
-## Quick demo
+```powershell
+pip install --force-reinstall --no-deps torch==2.12.0+cu130 --index-url https://download.pytorch.org/whl/cu130
+```
+
+Check CUDA:
+
+```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+## Quick Smoke Test
 
 Run:
 
-```bash
+```powershell
 python run_demo.py
 ```
 
-This performs a fast smoke-test run using randomly initialised models. It verifies that the dataset, models, metrics, visualisation utilities, checkpoint format, reconstruction visualisation, latent interpolation, and keyframe summarisation code all execute correctly.
+This creates synthetic examples and untrained model outputs. It verifies that the code runs, but the reconstructions are not meaningful yet.
 
-The outputs will be saved in:
+## Train on Synthetic Video
 
-```text
-outputs/
-```
+Train the frame-wise baseline:
 
-Important: the demo is only meant to confirm that the codebase works. The generated reconstructions are not meaningful because the demo does not train the models. For meaningful results, train using the commands below.
-
----
-
-## Full training workflow
-
-### Step 1: Train the frame-wise VAE baseline
-
-```bash
-python -m src.train_frame_vae \
-  --num-videos 2000 \
-  --epochs 30 \
-  --batch-size 32 \
-  --latent-dim 32 \
-  --out checkpoints/frame_vae.pt \
+```powershell
+python -m src.train_frame_vae `
+  --num-videos 2000 `
+  --epochs 30 `
+  --batch-size 32 `
+  --latent-dim 32 `
+  --out checkpoints/frame_vae.pt `
   --metrics-out outputs/frame_vae_metrics.json
 ```
 
-This trains a VAE that treats each frame independently.
+Train the temporal VAE:
 
-Conceptually:
-
-```text
-frame -> 2D Conv Encoder -> latent vector -> 2D Conv Decoder -> reconstructed frame
-```
-
-Since every frame is processed independently, this model may reconstruct individual frames reasonably well, but it does not directly encode motion as a sequence.
-
----
-
-### Step 2: Train the temporal video VAE
-
-```bash
-python -m src.train_temporal_vae \
-  --num-videos 2000 \
-  --epochs 40 \
-  --batch-size 32 \
-  --latent-dim 64 \
-  --out checkpoints/temporal_vae.pt \
+```powershell
+python -m src.train_temporal_vae `
+  --num-videos 2000 `
+  --epochs 40 `
+  --batch-size 32 `
+  --latent-dim 64 `
+  --out checkpoints/temporal_vae.pt `
   --metrics-out outputs/temporal_vae_metrics.json
 ```
 
-This trains a VAE that compresses the full video clip using 3D convolutions.
+Evaluate both:
 
-Conceptually:
-
-```text
-video clip -> 3D Conv Encoder -> latent vector -> 3D Conv Decoder -> reconstructed video clip
-```
-
-This model is more suitable for video because the encoder sees time, height, and width together.
-
----
-
-### Step 3: Evaluate both models
-
-```bash
-python -m src.evaluate \
-  --frame-ckpt checkpoints/frame_vae.pt \
-  --temporal-ckpt checkpoints/temporal_vae.pt \
-  --num-videos 300 \
+```powershell
+python -m src.evaluate `
+  --frame-ckpt checkpoints/frame_vae.pt `
+  --temporal-ckpt checkpoints/temporal_vae.pt `
+  --num-videos 300 `
   --out outputs/evaluation.json
 ```
 
-The evaluation reports:
+## Train on Something-Something V2
+
+This repository does not include the dataset. Download the Something-Something V2 archive parts and official labels separately.
+
+Expected download files:
+
+```text
+20bn-something-something-v2-00
+20bn-something-something-v2-01
+20bn-something-something-download-package-labels.zip
+```
+
+Prepare labels only:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare_something_something_v2.ps1
+```
+
+Extract a small training subset:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare_something_something_v2.ps1 -ExtractVideos -MaxVideos 500
+```
+
+Train the temporal VAE on the extracted subset:
+
+```powershell
+python -m src.train_temporal_vae `
+  --dataset something-v2 `
+  --data-root data/something_something_v2 `
+  --split train `
+  --input-channels 3 `
+  --image-size 64 `
+  --frames 16 `
+  --batch-size 8 `
+  --epochs 50 `
+  --latent-dim 128 `
+  --out checkpoints/temporal_vae.pt `
+  --metrics-out outputs/temporal_vae_metrics.json
+```
+
+## Visualize Reconstructions
+
+After training:
+
+```powershell
+python -m src.reconstruct_clip `
+  --dataset something-v2 `
+  --data-root data/something_something_v2 `
+  --split train `
+  --ckpt checkpoints/temporal_vae.pt `
+  --index 0 `
+  --out-dir outputs/reconstruction
+```
+
+For a more informative visual check, choose a high-motion clip instead of a mostly static one:
+
+```powershell
+python -m src.reconstruct_clip `
+  --dataset something-v2 `
+  --data-root data/something_something_v2 `
+  --split train `
+  --ckpt checkpoints/temporal_vae.pt `
+  --index 435 `
+  --out-dir outputs/reconstruction_motion
+```
+
+## Latent Interpolation
+
+```powershell
+python -m src.interpolate_latents `
+  --dataset something-v2 `
+  --data-root data/something_something_v2 `
+  --split train `
+  --ckpt checkpoints/temporal_vae.pt `
+  --index-a 0 `
+  --index-b 5 `
+  --steps 7 `
+  --out-dir outputs
+```
+
+## Keyframe Selection
+
+Keyframe selection uses the frame-wise VAE because it produces one latent vector per frame:
+
+```powershell
+python -m src.summarize_video `
+  --dataset something-v2 `
+  --data-root data/something_something_v2 `
+  --split train `
+  --ckpt checkpoints/frame_vae.pt `
+  --index 0 `
+  --num-keyframes 5 `
+  --out-dir outputs
+```
+
+## Metrics
+
+The project reports:
 
 | Metric | Meaning | Better |
 |---|---|---|
-| MSE | Pixel-wise reconstruction error | Lower |
-| PSNR | Signal-to-noise reconstruction quality | Higher |
+| MSE | Pixel reconstruction error | Lower |
+| PSNR | Reconstruction signal-to-noise quality | Higher |
 | SSIM global | Dependency-free global SSIM approximation | Higher |
-| Temporal MSE | Error in frame-to-frame motion differences | Lower |
+| Temporal MSE | Error in frame-to-frame differences | Lower |
 
-The most relevant metric for this project is **temporal MSE**, because it checks whether the reconstruction preserves motion, not just frame appearance.
+For video, `temporal_mse` is especially useful because it measures whether motion/change is preserved, not just whether individual frames look similar.
 
----
+## Notes and Limitations
 
-### Step 4: Reconstruct a video clip
+- The models are intentionally small and educational.
+- Reconstructions will be blurry compared with modern video generative models.
+- The temporal VAE compresses a whole clip into one latent vector, which is a hard bottleneck.
+- The default real-video setup uses 64x64 clips for manageable training.
+- This is not a diffusion model and does not include perceptual, adversarial, or LPIPS losses.
+- Dataset archives, extracted videos, generated outputs, and checkpoints should generally not be committed to GitHub.
 
-```bash
-python -m src.reconstruct_clip \
-  --ckpt checkpoints/temporal_vae.pt \
-  --index 0 \
-  --out-dir outputs
-```
-
-This saves:
+## Suggested `.gitignore`
 
 ```text
-outputs/input_strip.png
-outputs/reconstruction_strip.png
-outputs/reconstruction_comparison.png
-outputs/reconstruction_metrics.json
+.venv/
+__pycache__/
+*.pyc
+data/
+checkpoints/*.pt
+outputs/
 ```
 
-The comparison image shows:
+## Resume Summary
 
-```text
-input video
-reconstructed video
-absolute error
-```
-
----
-
-### Step 5: Interpolate between two video latents
-
-```bash
-python -m src.interpolate_latents \
-  --ckpt checkpoints/temporal_vae.pt \
-  --index-a 0 \
-  --index-b 5 \
-  --steps 7 \
-  --out-dir outputs
-```
-
-This encodes two videos into latent vectors, linearly interpolates between them, decodes the intermediate latents, and saves:
-
-```text
-outputs/latent_interpolation.png
-outputs/interpolation_source_a.png
-outputs/interpolation_source_b.png
-```
-
-This demonstrates that the VAE latent space can be used for simple generative operations.
-
----
-
-### Step 6: Latent-based video summarisation
-
-```bash
-python -m src.summarize_video \
-  --ckpt checkpoints/frame_vae.pt \
-  --index 0 \
-  --num-keyframes 5 \
-  --out-dir outputs
-```
-
-This uses the frame-wise VAE latents to select keyframes. Frames with larger latent changes are treated as more informative.
-
-Output:
-
-```text
-outputs/latent_keyframes.png
-outputs/latent_keyframes.json
-outputs/summary_full_strip.png
-```
-
-This is a simple demonstration of how learned latents can support downstream tasks beyond reconstruction.
-
----
-
-## Dataset used by default
-
-The default dataset is synthetic and generated on the fly. Each clip contains a moving object:
-
-- square
-- circle
-- diamond
-
-Each clip has shape:
-
-```text
-[channels, frames, height, width] = [1, 16, 32, 32]
-```
-
-The object moves across the frame and bounces off boundaries. The dataset can also inject anomalies such as sudden jumps or occluded frames.
-
-You can evaluate on anomalous clips using:
-
-```bash
-python -m src.evaluate \
-  --frame-ckpt checkpoints/frame_vae.pt \
-  --temporal-ckpt checkpoints/temporal_vae.pt \
-  --anomaly-prob 0.5 \
-  --out outputs/evaluation_anomalous.json
-```
-
----
-
-## How to extend this to real video datasets
-
-To use UCF101, Kinetics, or Something-Something V2, replace `SyntheticMovingShapesDataset` in `src/data.py` with a dataset class that returns the same format:
-
-```python
-{
-    "video": FloatTensor with shape [1, T, H, W] or [3, T, H, W],
-    "label": class_label,
-    "is_anomaly": 0 or 1
-}
-```
-
-For RGB videos, update the model input channels from `1` to `3` in `src/models.py`.
-
-Recommended preprocessing for real datasets:
-
-1. Decode videos into frames.
-2. Resize frames to a fixed size, for example 64x64 or 128x128.
-3. Sample fixed-length clips, for example 16 or 32 frames.
-4. Normalize pixel values to `[0, 1]`.
-5. Train the same FrameVAE and TemporalVAE models.
+Built a PyTorch video VAE pipeline for latent video compression and reconstruction, comparing frame-wise and temporal encoders on synthetic and real video data with reconstruction metrics, latent interpolation, and keyframe summarization.
